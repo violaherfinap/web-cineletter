@@ -1,0 +1,33 @@
+@reference "tailwindcss"; /* HARUS di paling atas! */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=Roboto+Mono&family=Merriweather&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Theme color */
+:root {
+  --background: #0a0b36;
+  --foreground: #ffffff;
+}
+
+/* Mode gelap */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0b36;
+    --foreground: #ffffff;
+  }
+}
+
+/* Reset bawaan browser */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Gaya utama */
+body {
+  @apply bg-[#0a0b36] text-white font-sans;
+}
