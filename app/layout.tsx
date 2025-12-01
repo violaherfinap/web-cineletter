@@ -13,7 +13,7 @@ const poppins = Poppins({
 
 export const metadata: Metadata = {
   title: "DBMSATRIA",
-  description: "Website project by Atria for Database & Movies",
+  description: "Website project by Satria and Vio for Movies & Tv-Shows Database",
 };
 
 export default function RootLayout({
@@ -24,7 +24,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${poppins.variable} antialiased font-sans`}>
-        {/* Navbar akan tampil di semua halaman */}
+        {/* Navbar di semua halaman */}
         <Navbar />
 
         {/* Halaman utama (Home, Movies, TV-Show, dll) */}
@@ -32,7 +32,7 @@ export default function RootLayout({
           {children}
         </main>
 
-        {/* Footer juga tampil di semua halaman */}
+        {/* Footer di semua halaman */}
         <Footer />
       </body>
     </html>

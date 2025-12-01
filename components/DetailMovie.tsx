@@ -83,10 +83,10 @@ export default function DetailMovie({ movie }: { movie: any }) {
 
           {/* Tombol */}
           <div className="flex gap-4">
-            <button className="bg-[#ff3b3b] text-white px-5 py-2 rounded-lg hover:bg-[#ff6b6b] transition">
+            <button className="bg-[#ff1f1f] text-white px-5 py-2 rounded-lg hover:bg-[#ff6b6b] transition">
               Add to Watchlist
             </button>
-            <button className="bg-white/20 text-white px-5 py-2 rounded-lg hover:bg-white/30 transition">
+            <button className="bg-white/20 text-red px-5 py-2 rounded-lg hover:bg-white/30 transition">
               Share
             </button>
           </div>

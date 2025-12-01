@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 export default function Card({ title, genre, year, poster, director, description }: any) {
-  // slug dibuat di dalam fungsi setelah title tersedia
   const slug = title.toLowerCase().replace(/\s+/g, "-");
 
   return (
@@ -18,7 +17,7 @@ export default function Card({ title, genre, year, poster, director, description
         <div>
           {/* Judul clickable */}
           <Link href={`/movies/${slug}`} className="no-underline cursor-pointer">
-            <h3 className="font-bold text-3xl mb-1 text-[#ff3b3b] hover:text-[#ff6b6b]">
+            <h3 className="font-bold text-4xl mt-5 mb-1 text-[#f00707] hover:text-[#ff6b6b]">
               {title}
             </h3>
           </Link>
@@ -35,7 +34,7 @@ export default function Card({ title, genre, year, poster, director, description
             <Link
               key={index}
               href={`/genre/${g.toLowerCase()}`}
-              className="no-underline cursor-pointer bg-[#08092e] text-white px-3 py-1 rounded-full text-xs hover:bg-[#121463] transition"
+              className="no-underline cursor-pointer bg-[#121463] text-white px-3 py-1 rounded-full text-md hover:bg-[#0929ab] transition"
             >
               {g}
             </Link>
