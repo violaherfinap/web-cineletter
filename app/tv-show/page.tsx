@@ -56,8 +56,6 @@ export default function MoviesPage() {
     return {
       ...movie,
       id: i,
-      // Gunakan slug asli untuk 5 data pertama agar link Wicked valid.
-      // Selebihnya tambahkan index agar unik.
       slug: i < 5 ? movie.slug : `${movie.slug}-${i}`, 
       title: i < 5 ? movie.title : `${movie.title} ${i + 1}`,
     };
@@ -86,7 +84,6 @@ export default function MoviesPage() {
           {manyMovies.map((movie) => (
             <Link
               key={movie.id}
-              // PERBAIKAN: Mengarah ke folder /movies/ (PLURAL)
               href={`/movies/${movie.slug}`} 
               className="block group relative rounded-md overflow-hidden transition-transform hover:scale-105 aspect-[2/3]"
             >
