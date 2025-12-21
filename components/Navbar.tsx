@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Search, User, ChevronDown, Edit, LayoutDashboard } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import AuthModal from "@/components/AuthModal"; // <<— MODAL RESMI
+import AuthModal from "@/components/AuthModal";
 
 export default function Navbar() {
   const [search, setSearch] = useState("");
@@ -13,6 +13,10 @@ export default function Navbar() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showEditSearch, setShowEditSearch] = useState(false);
   const [editSearch, setEditSearch] = useState("");
+
+  // --- SIMULASI ROLE (DIUBAH KE EXECUTIVE) ---
+  // Karena "executive" !== "marketing", maka menu Edit Data akan MUNCUL.
+  const userRole = "executive"; 
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -61,14 +65,14 @@ export default function Navbar() {
           {/* LEFT: Logo */}
           <div className="flex items-center space-x-2">
             <div className="bg-[#ffffff] text-[#0d0d0d] rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">
-              D
+              C
             </div>
             <span
               className={`font-bold text-lg tracking-wide transition-all duration-300 ${
                 isScrolled ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
               }`}
             >
-              DBMSATRIA
+              CineLetter
             </span>
           </div>
 
@@ -88,7 +92,7 @@ export default function Navbar() {
               </Link>
             ))}
 
-            {/* Executive Dropdown */}
+            {/* Role Access Dropdown */}
             <div className="relative select-none" ref={dropdownRef}>
               <div
                 onClick={() => setShowDropdown((prev) => !prev)}
@@ -96,7 +100,7 @@ export default function Navbar() {
                   showDropdown ? "text-[#ff1212]" : "text-white hover:text-[#ffffffb3]"
                 }`}
               >
-                Executive Only
+                Role Access
                 <ChevronDown
                   className={`w-4 h-4 transform transition-transform ${
                     showDropdown ? "rotate-180" : "rotate-0"
@@ -106,23 +110,29 @@ export default function Navbar() {
 
               {showDropdown && (
                 <div className="absolute mt-2 right-0 bg-[#0f0f3a] border border-[#ffffff1a] rounded-lg shadow-lg w-40 py-2 z-50">
+                  
+                  {/* Menu 1: Dashboard */}
                   <Link
-                    href="/executive/dashboard"
+                    href="/portal/select" 
                     className="flex items-center no-underline gap-2 px-4 py-2 text-sm text-white hover:bg-[#1b1b5a] transition"
                     onClick={() => setShowDropdown(false)}
                   >
                     <LayoutDashboard className="w-4 h-4" /> Dashboard
                   </Link>
 
-                  <div
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-white hover:bg-[#1b1b5a] transition cursor-pointer"
-                    onClick={() => {
-                      setShowEditSearch(true);
-                      setShowDropdown(false);
-                    }}
-                  >
-                    <Edit className="w-4 h-4" /> Edit Data
-                  </div>
+                  {/* Menu 2: Edit Data (MUNCUL KARENA ROLE = EXECUTIVE) */}
+                  {userRole !== "marketing" && (
+                    <div
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-white hover:bg-[#1b1b5a] transition cursor-pointer"
+                      onClick={() => {
+                        setShowEditSearch(true);
+                        setShowDropdown(false);
+                      }}
+                    >
+                      <Edit className="w-4 h-4" /> Edit Data
+                    </div>
+                  )}
+
                 </div>
               )}
             </div>
@@ -195,7 +205,7 @@ export default function Navbar() {
         </div>
       )}
 
-      {/* POPUP AUTH — MODAL RESMI DARI COMPONENTS */}
+      {/* POPUP AUTH */}
       <AuthModal isOpen={showAuth} onClose={() => setShowAuth(false)} />
 
     </>
