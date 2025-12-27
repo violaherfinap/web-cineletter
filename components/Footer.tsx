@@ -11,7 +11,7 @@ export default function Footer() {
             CINE<span className="text-[#ff3b3b]">LETTER</span>
           </h2>
           <p className="text-xs text-gray-500 mt-1">
-            Platform ulasan film terbaik kerajaan.
+            Platform pencarian film dan tv show terbaik.
           </p>
         </div>
 

@@ -11,20 +11,20 @@ export default function AboutPage() {
       name: "Satria Manggala",
       nim: "L0224024",
       role: "Co-Founder / Data Scientist",
-      image: "/satria.jpg",
-      desc: "Ahli strategi data yang memastikan setiap bit dan byte tersusun rapi dalam sistem CineLetter.",
+      image: "/backdrop.jpg",
+      desc: "Sains Data UNS '24",
     },
     {
       name: "Viola Herfina Putri",
       nim: "L0224026",
       role: "Co-Founder / Data Scientist",
-      image: "/vio.jpg",
-      desc: "Sang visioner di balik CineLetter, menggabungkan keindahan desain dengan kecerdasan data.",
+      image: "/backdrop.jpg",
+      desc: "Sains Data UNS '24",
     },
   ];
 
   return (
-    <div className="min-h-screen bg-[#0a0a1a] text-white pt-24 pb-16">
+    <div className="min-h-screen bg-[#0a0a1a] text-white pt-10 pb-16">
       <div className="max-w-5xl mx-auto px-6">
 
         {/* Header */}
