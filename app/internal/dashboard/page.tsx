@@ -1,1049 +1,752 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
 import { Suspense, useState, useEffect } from "react";
 // Import Recharts
 import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, Legend, BarChart, Bar, ScatterChart, Scatter, ZAxis, LineChart, Line, ComposedChart,
-  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
+  PieChart, Pie, Cell, Legend, BarChart, Bar, ScatterChart, Scatter, ZAxis, 
+  RadialBarChart, RadialBar, PolarAngleAxis
 } from "recharts";
 // Import Icons
 import { 
-  Building2, Star, Users, LayoutGrid, Film, Calendar, 
-  Users as UsersIcon, DollarSign, Menu, X, 
-  Activity, TrendingUp, PlayCircle, Globe, Tv, Crown, Flame, Clock, AlertCircle, Heart, UserCheck, Video, Award, MapPin, Languages, Radar as RadarIcon, Hourglass, ShieldAlert, Baby, PieChart as PieIcon, BarChart as BarChartIcon
+  Star, Users, Film, Activity, Globe, AlertCircle, PieChart as PieIcon, 
+  Filter, ChevronDown, Map as MapIcon
 } from "lucide-react";
 
+// --- HIGHCHARTS IMPORTS ---
+import Highcharts from "highcharts";
+import HighchartsReact from "highcharts-react-official";
+import worldMap from "@highcharts/map-collection/custom/world.geo.json";
+
 // --- KONSTANTA WARNA ---
-const COLOR_MOVIE = "#8b5cf6"; // Ungu
-const COLOR_TV    = "#1e90ff"; // Biru
-const COLORS_GENRE = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'];
+const COLOR_PRIMARY = "#ff3b3b"; 
 
 // ==========================================
-// DATA DUMMY
+// COMPONENT: CHOROPLETH MAP (HIGHCHARTS)
 // ==========================================
-const kpiStats = { moviesCount: "8,200", tvCount: "4,250", brandRating: "8.4", engagement: "2.8B" };
-const productionTrendData = [
-  { year: '2019', movies: 30, tv: 15 }, { year: '2020', movies: 20, tv: 12 }, 
-  { year: '2021', movies: 35, tv: 23 }, { year: '2022', movies: 45, tv: 29 },
-  { year: '2023', movies: 50, tv: 32 }, { year: '2024', movies: 55, tv: 40 },
-];
-const portfolioData = [{ name: 'Movies', value: 65 }, { name: 'TV Shows', value: 35 }];
-const recentReleases = [
-  { id: 1, title: "Moana 2", year: "2024", popularity: "Trending", popScore: 98, type: "Movie" },
-  { id: 2, title: "Mufasa", year: "2024", popularity: "High", popScore: 85, type: "Movie" },
-  { id: 3, title: "Inside Out 2", year: "2024", popularity: "Blockbuster", popScore: 92, type: "Movie" },
-  { id: 4, title: "Agatha All Along", year: "2024", popularity: "Rising", popScore: 74, type: "TV Show" },
-  { id: 5, title: "Elio", year: "2025", popularity: "Anticipated", popScore: 65, type: "Movie" },
-];
+const ChoroplethMap = () => {
+  const [metric, setMetric] = useState<'rating' | 'votes'>('votes');
+  const [isOpen, setIsOpen] = useState(false);
 
-// Genre Data
-const genreKPI = { 
-    dominant: "Action Adventure", 
-    dominantValue: "35% of Total", 
-    highestRated: "Documentary", 
-    highestRatedValue: "8.8/10",   
-    mostViral: "Animation", 
-    mostViralValue: "1.2B Views"   
-};
-const genreLandscapeData = [
-  { name: 'Action', count: 120, rating: 7.2 }, { name: 'Drama', count: 98, rating: 8.1 },
-  { name: 'Comedy', count: 86, rating: 6.9 }, { name: 'Horror', count: 65, rating: 5.8 },
-  { name: 'Sci-Fi', count: 45, rating: 7.8 }, { name: 'Docu', count: 30, rating: 8.8 },
-];
-const genreMatrixData = [
-  { genre: 'Action', x: 120, y: 7.2, z: 200 }, { genre: 'Drama', x: 98, y: 8.1, z: 150 },
-  { genre: 'Comedy', x: 86, y: 6.9, z: 100 }, { genre: 'Horror', x: 65, y: 5.8, z: 80 },
-  { genre: 'Sci-Fi', x: 45, y: 7.8, z: 120 }, { genre: 'Animation', x: 110, y: 8.5, z: 250 },
-  { genre: 'Romance', x: 40, y: 6.5, z: 50 },
-];
-const genreEvolutionData = [
-  { year: '2020', action: 30, drama: 40, comedy: 20, horror: 10 },
-  { year: '2021', action: 35, drama: 35, comedy: 25, horror: 15 },
-  { year: '2022', action: 45, drama: 30, comedy: 15, horror: 20 },
-  { year: '2023', action: 50, drama: 25, comedy: 15, horror: 25 },
-  { year: '2024', action: 60, drama: 20, comedy: 10, horror: 30 },
-];
-const topVolumeGenreRatingTrend = [
-  { year: '2020', Action: 6.8, Drama: 7.9, Comedy: 6.5, Horror: 5.5, SciFi: 7.2 },
-  { year: '2021', Action: 7.0, Drama: 8.0, Comedy: 6.7, Horror: 5.8, SciFi: 7.5 },
-  { year: '2022', Action: 7.4, Drama: 7.8, Comedy: 6.4, Horror: 6.2, SciFi: 7.3 }, 
-  { year: '2023', Action: 7.2, Drama: 7.6, Comedy: 6.8, Horror: 6.5, SciFi: 7.9 }, 
-  { year: '2024', Action: 7.5, Drama: 7.5, Comedy: 7.0, Horror: 5.9, SciFi: 8.2 }, 
-];
+  // FIX: Load Map Module secara aman
+  useEffect(() => {
+    if (typeof window !== "undefined" && Highcharts) {
+        try {
+            const mapModule = require("highcharts/modules/map");
+            mapModule(Highcharts);
+        } catch (e) {
+            console.warn("Highcharts map module already loaded");
+        }
+    }
+  }, []);
 
-// Year Data
-const yearKPI = { golden: "2016", peak: "2022", current: "7.9" };
-const qualityTimelineData = [
-  { year: '2018', rating: 7.2, popularity: 45 }, { year: '2019', rating: 7.8, popularity: 60 }, 
-  { year: '2020', rating: 6.5, popularity: 30 }, { year: '2021', rating: 7.0, popularity: 55 },
-  { year: '2022', rating: 7.5, popularity: 75 }, { year: '2023', rating: 7.2, popularity: 65 },
-  { year: '2024', rating: 7.9, popularity: 88 },
-];
-const runtimeData = [
-  { year: '2018', minutes: 110 }, { year: '2019', minutes: 125 }, { year: '2020', minutes: 105 }, 
-  { year: '2021', minutes: 118 }, { year: '2022', minutes: 132 }, { year: '2023', minutes: 128 },
-  { year: '2024', minutes: 135 },
-];
-const statusData = [
-  { year: '2020', released: 20, canceled: 5, ended: 2 }, { year: '2021', released: 35, canceled: 3, ended: 5 },
-  { year: '2022', released: 45, canceled: 2, ended: 8 }, { year: '2023', released: 40, canceled: 8, ended: 10 },
-  { year: '2024', released: 50, canceled: 1, ended: 4 },
-];
-
-// Talent Data
-const talentKPI = { mostUsed: "Samuel L. Jackson", topDirectorName: "Pete Docter", topDirectorRating: "9.2", retention: "340 Crew" };
-const topCollaboratorsData = [
-    { name: 'Michael Giacchino', count: 18, role: 'Composer' }, { name: 'Samuel L. Jackson', count: 15, role: 'Actor' },
-    { name: 'Kevin Feige', count: 14, role: 'Producer' }, { name: 'Alan Menken', count: 12, role: 'Composer' },
-    { name: 'Frank Welker', count: 10, role: 'Voice Actor' }, { name: 'Robert Downey Jr.', count: 9, role: 'Actor' },
-    { name: 'Jon Favreau', count: 8, role: 'Director' },
-];
-const directorSuccessData = [
-    { name: 'Russo Brothers', count: 4, rating: 8.5 }, { name: 'Jon Favreau', count: 6, rating: 7.8 },
-    { name: 'Taika Waititi', count: 3, rating: 7.9 }, { name: 'J.J. Abrams', count: 5, rating: 7.0 },
-    { name: 'Rob Marshall', count: 8, rating: 6.5 }, { name: 'Brad Bird', count: 2, rating: 8.2 },
-    { name: 'Guy Ritchie', count: 2, rating: 7.2 },
-];
-const castImpactData = [
-    { name: 'RDJ', rating: 8.0, popularity: 95, count: 10 }, { name: 'Chris Evans', rating: 7.8, popularity: 90, count: 9 },
-    { name: 'Scarlett Johansson', rating: 7.5, popularity: 88, count: 8 }, { name: 'Chris Pratt', rating: 7.2, popularity: 85, count: 6 },
-    { name: 'Tom Holland', rating: 7.9, popularity: 98, count: 5 }, { name: 'Dwayne Johnson', rating: 6.8, popularity: 92, count: 4 },
-    { name: 'Emma Stone', rating: 7.6, popularity: 80, count: 3 },
-];
-
-// AKAs Data
-const akasKPI = { effortScore: "12.5", topRegion: "France (FR)", retention: "65%" };
-const regionData = [
-    { name: 'France', code: 'FR', count: 450 }, { name: 'Japan', code: 'JP', count: 420 },
-    { name: 'Germany', code: 'DE', count: 380 }, { name: 'Spain', code: 'ES', count: 350 },
-    { name: 'Italy', code: 'IT', count: 310 }, { name: 'Brazil', code: 'BR', count: 290 },
-    { name: 'Russia', code: 'RU', count: 250 },
-];
-const languageRadarData = [
-    { subject: 'English', A: 120, fullMark: 150 }, { subject: 'French', A: 98, fullMark: 150 },
-    { subject: 'Spanish', A: 86, fullMark: 150 }, { subject: 'Japanese', A: 99, fullMark: 150 },
-    { subject: 'Chinese', A: 85, fullMark: 150 }, { subject: 'German', A: 65, fullMark: 150 },
-];
-const globalReachData = [
-    { year: '2018', regions: 8 }, { year: '2019', regions: 10 }, { year: '2020', regions: 7 }, 
-    { year: '2021', regions: 12 }, { year: '2022', regions: 15 }, { year: '2023', regions: 18 },
-    { year: '2024', regions: 22 }, 
-];
-
-// Content Data
-const contentKPI = { avgRuntimeMovie: "124 min", avgRuntimeSeries: "42 min", adultRatio: "2.4%" };
-const runtimeDistData = [
-    { range: '< 30m', count: 120 }, { range: '30-90m', count: 200 }, { range: '90-120m', count: 450 }, 
-    { range: '120-150m', count: 300 }, { range: '> 150m', count: 80 },
-];
-const adultFamilyData = [
-    { type: 'Family/General', rating: 7.8, popularity: 85 },
-    { type: 'Adult (18+)', rating: 6.5, popularity: 92 },
-];
-const genreRuntimeData = [
-    { genre: 'Biography', minutes: 135 }, { genre: 'Action', minutes: 128 }, { genre: 'Drama', minutes: 115 },
-    { genre: 'Romance', minutes: 105 }, { genre: 'Comedy', minutes: 98 }, { genre: 'Horror', minutes: 92 },
-    { genre: 'Animation', minutes: 88 },
-];
-
-
-function DashboardContent() {
-  const searchParams = useSearchParams();
-  const [mounted, setMounted] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
-  const [activeView, setActiveView] = useState("overview"); 
-
-  useEffect(() => { setMounted(true); }, []);
-  
-  const companyId = searchParams.get("company") || "general";
-  const role = searchParams.get("role") || "Guest";
-  const isDisney = companyId === "disney";
-  const themeColor = isDisney ? "#1e90ff" : "#ff3b3b"; 
-  const companyLabel = isDisney ? "Walt Disney Studios" : companyId.toUpperCase();
-
-  const sidebarMenus = [
-    { id: "overview", label: "Overview", icon: LayoutGrid },
-    { id: "genre", label: "Genre Analysis", icon: Activity },
-    { id: "year", label: "Yearly Archive", icon: Calendar },
-    { id: "talent", label: "Talent & Crew", icon: UsersIcon },
-    { id: "akas", label: "AKAs-Language", icon: Globe },
-    { id: "content", label: "Content Details", icon: Film },
+  /* =======================
+     DATA RAW 
+  ======================= */
+  const rawMapData = [
+    { key: "us", name: "United States", rating: 7.5, votes: 12500000 },
+    { key: "id", name: "Indonesia", rating: 8.2, votes: 8500000 },
+    { key: "jp", name: "Japan", rating: 8.8, votes: 4200000 },
+    { key: "fr", name: "France", rating: 7.2, votes: 3100000 },
+    { key: "de", name: "Germany", rating: 7.4, votes: 2900000 },
+    { key: "gb", name: "United Kingdom", rating: 7.6, votes: 5500000 },
+    { key: "br", name: "Brazil", rating: 7.9, votes: 6200000 },
+    { key: "in", name: "India", rating: 7.0, votes: 9100000 },
+    { key: "cn", name: "China", rating: 6.8, votes: 8000000 },
+    { key: "au", name: "Australia", rating: 7.3, votes: 1500000 },
+    { key: "ru", name: "Russia", rating: 6.5, votes: 2100000 },
+    { key: "ca", name: "Canada", rating: 7.7, votes: 1800000 },
+    { key: "mx", name: "Mexico", rating: 7.8, votes: 3800000 },
+    { key: "za", name: "South Africa", rating: 7.1, votes: 900000 },
   ];
 
-  if (!mounted) return <div className="p-10 text-center text-white">Loading Empire Data...</div>;
+  // Transform Data sesuai Metric
+  const chartData = rawMapData.map(item => [item.key, metric === 'rating' ? item.rating : item.votes]);
+  
+  const values = chartData.map(d => d[1] as number);
+  const minVal = Math.min(...values);
+  const maxVal = Math.max(...values);
 
-  // --- RENDER 1: OVERVIEW ---
-  const renderOverview = () => (
-    <div className="space-y-8 animate-fadeIn">
-        {/* KPI */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-[#121212] p-6 rounded-xl border border-white/5 flex items-center gap-5">
-                <div className="space-y-4 w-full">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-purple-900/20 text-purple-400"><Film className="w-5 h-5" /></div>
-                            <span className="text-sm text-gray-400 font-bold uppercase tracking-wider">Movies</span>
-                        </div>
-                        <span className="text-2xl font-black text-white">{kpiStats.moviesCount}</span>
-                    </div>
-                    <div className="w-full h-[1px] bg-white/5"></div>
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-blue-900/20 text-blue-400"><Tv className="w-5 h-5" /></div>
-                            <span className="text-sm text-gray-400 font-bold uppercase tracking-wider">TV Shows</span>
-                        </div>
-                        <span className="text-2xl font-black text-white">{kpiStats.tvCount}</span>
-                    </div>
-                </div>
-            </div>
-            <div className="bg-[#121212] p-6 rounded-xl border border-white/5 flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-yellow-900/20 flex items-center justify-center border border-yellow-500/20">
-                    <Star className="w-7 h-7 text-yellow-400" />
-                </div>
-                <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-widest font-bold">Global Brand Rating</p>
-                    <h3 className="text-3xl font-black text-white mt-1">{kpiStats.brandRating}<span className="text-lg text-gray-500">/10</span></h3>
-                </div>
-            </div>
-            <div className="bg-[#121212] p-6 rounded-xl border border-white/5 flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-green-900/20 flex items-center justify-center border border-green-500/20">
-                    <Users className="w-7 h-7 text-green-400" />
-                </div>
-                <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-widest font-bold">Total Engagement</p>
-                    <h3 className="text-3xl font-black text-white mt-1">{kpiStats.engagement}</h3>
-                </div>
-            </div>
-        </div>
-
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-8">
-                <div className="bg-[#121212] p-6 rounded-2xl border border-white/5">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-lg font-bold text-white">Production Trend</h3>
-                        <TrendingUp className="w-5 h-5 text-gray-500" />
-                    </div>
-                    <div className="h-[280px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={productionTrendData}>
-                                <defs>
-                                    <linearGradient id="colorMovies" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor={COLOR_MOVIE} stopOpacity={0.3}/><stop offset="95%" stopColor={COLOR_MOVIE} stopOpacity={0}/>
-                                    </linearGradient>
-                                    <linearGradient id="colorTV" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor={COLOR_TV} stopOpacity={0.3}/><stop offset="95%" stopColor={COLOR_TV} stopOpacity={0}/>
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                                <XAxis dataKey="year" stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
-                                <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }} />
-                                <Legend verticalAlign="top" height={36} iconType="circle"/>
-                                <Area type="monotone" dataKey="movies" name="Movies" stroke={COLOR_MOVIE} fillOpacity={1} fill="url(#colorMovies)" strokeWidth={3} />
-                                <Area type="monotone" dataKey="tv" name="TV Shows" stroke={COLOR_TV} fillOpacity={1} fill="url(#colorTV)" strokeWidth={3} />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-                <div className="bg-[#121212] p-6 rounded-2xl border border-white/5">
-                    <h3 className="text-lg font-bold text-white mb-6">Portfolio Composition</h3>
-                    <div className="h-[250px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie data={portfolioData} innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value">
-                                    <Cell fill={COLOR_MOVIE} /><Cell fill={COLOR_TV} />
-                                </Pie>
-                                <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333' }} />
-                                <Legend verticalAlign="middle" align="right" layout="vertical" iconType="circle" />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            </div>
-
-            <div className="lg:col-span-1">
-                <div className="bg-[#121212] h-full rounded-2xl border border-white/5 overflow-hidden flex flex-col">
-                    <div className="p-6 border-b border-white/5 bg-[#181818]">
-                        <h3 className="font-bold flex items-center gap-2 text-white">
-                            <PlayCircle className="w-5 h-5 text-green-400" /> Top 5 Recent
-                        </h3>
-                    </div>
-                    <div className="p-4 space-y-3 flex-1 overflow-y-auto">
-                        {recentReleases.map((item) => (
-                            <div key={item.id} className="p-4 rounded-xl bg-[#0a0a0a] border border-white/5 hover:border-white/20 transition group">
-                                <div className="flex justify-between items-start mb-1">
-                                    <span className="text-xs font-bold text-gray-400">{item.year}</span>
-                                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${item.type === 'Movie' ? 'bg-purple-900/30 text-purple-400' : 'bg-blue-900/30 text-blue-400'}`}>{item.type}</span>
-                                </div>
-                                <h4 className="font-bold text-white text-sm group-hover:text-blue-400 transition-colors truncate mb-3">{item.title}</h4>
-                                <div className="flex items-center gap-3">
-                                    <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
-                                        <div className="h-full bg-gradient-to-r from-green-600 to-green-400" style={{ width: `${item.popScore}%` }}></div>
-                                    </div>
-                                    <div className="text-right">
-                                        <span className="block text-lg font-black text-white leading-none">{item.popScore}</span>
-                                        <span className="text-[10px] text-gray-500 uppercase font-bold">Pop. Index</span>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-  );
-
-  // --- RENDER 2: GENRE ---
-  const renderGenre = () => (
-    <div className="space-y-8 animate-fadeIn">
-         {/* KPI */}
-         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-[#121212] p-6 rounded-xl border border-white/5 flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-orange-900/20 flex items-center justify-center border border-orange-500/20">
-                    <Crown className="w-7 h-7 text-orange-400" />
-                </div>
-                <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-widest font-bold">Dominant Genre</p>
-                    <h3 className="text-2xl font-black text-white mt-1">{genreKPI.dominant}</h3>
-                    <p className="text-xs text-orange-400 mt-1 font-bold">{genreKPI.dominantValue}</p>
-                </div>
-            </div>
-            <div className="bg-[#121212] p-6 rounded-xl border border-white/5 flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-yellow-900/20 flex items-center justify-center border border-yellow-500/20">
-                    <Star className="w-7 h-7 text-yellow-400" />
-                </div>
-                <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-widest font-bold">Highest Rated</p>
-                    <h3 className="text-2xl font-black text-white mt-1">{genreKPI.highestRated}</h3>
-                    <p className="text-xs text-yellow-400 mt-1 font-bold">{genreKPI.highestRatedValue}</p>
-                </div>
-            </div>
-            <div className="bg-[#121212] p-6 rounded-xl border border-white/5 flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-red-900/20 flex items-center justify-center border border-red-500/20">
-                    <Flame className="w-7 h-7 text-red-400" />
-                </div>
-                <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-widest font-bold">Most Viral</p>
-                    <h3 className="text-2xl font-black text-white mt-1">{genreKPI.mostViral}</h3>
-                    <p className="text-xs text-red-400 mt-1 font-bold">{genreKPI.mostViralValue}</p>
-                </div>
-            </div>
-         </div>
-
-         {/* Charts */}
-         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5 lg:col-span-2">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-white">Genre Performance Matrix</h3>
-                        <p className="text-xs text-gray-500">Volume vs Rating</p>
-                    </div>
-                    <Activity className="w-5 h-5 text-gray-500" />
-                </div>
-                <div className="h-[350px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                            <XAxis type="number" dataKey="x" name="Volume" stroke="#666" />
-                            <YAxis type="number" dataKey="y" name="Rating" stroke="#666" domain={[0, 10]} />
-                            <ZAxis type="number" dataKey="z" range={[60, 400]} />
-                            <Tooltip cursor={{ strokeDasharray: '3 3' }} content={({ active, payload }) => {
-                                    if (active && payload && payload.length) {
-                                      const data = payload[0].payload;
-                                      return (
-                                        <div className="bg-black border border-white/20 p-3 rounded-lg shadow-xl">
-                                          <p className="font-bold text-white mb-1">{data.genre}</p>
-                                          <p className="text-xs text-gray-400">Vol: <span className="text-white">{data.x}</span></p>
-                                          <p className="text-xs text-gray-400">Rating: <span className="text-yellow-400">{data.y}</span></p>
-                                        </div>
-                                      );
-                                    }
-                                    return null;
-                                }}
-                            />
-                            <Scatter name="Genres" data={genreMatrixData} fill={themeColor}>
-                                {genreMatrixData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS_GENRE[index % COLORS_GENRE.length]} />
-                                ))}
-                            </Scatter>
-                        </ScatterChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5">
-                <div className="mb-6">
-                     <h3 className="text-lg font-bold text-white">Genre Landscape</h3>
-                </div>
-                <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={genreLandscapeData} layout="vertical">
-                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" horizontal={false} />
-                            <XAxis type="number" stroke="#666" fontSize={12} />
-                            <YAxis dataKey="name" type="category" stroke="#fff" fontSize={12} width={80} />
-                            <Tooltip cursor={{fill: '#ffffff10'}} contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }} />
-                            <Bar dataKey="count" fill={themeColor} radius={[0, 4, 4, 0]} barSize={20}>
-                                {genreLandscapeData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.rating < 6 ? '#ef4444' : themeColor} /> 
-                                ))}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5">
-                <div className="mb-6">
-                     <h3 className="text-lg font-bold text-white">Top 5 Genres: Rating Trend</h3>
-                     <p className="text-xs text-gray-500">Quality evolution of high-volume genres</p>
-                </div>
-                <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={topVolumeGenreRatingTrend}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                            <XAxis dataKey="year" stroke="#666" fontSize={12} />
-                            <YAxis stroke="#666" fontSize={12} domain={[5, 10]} />
-                            <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }} />
-                            <Legend wrapperStyle={{ fontSize: '10px' }} />
-                            <Line type="monotone" dataKey="Action" stroke="#8b5cf6" strokeWidth={2} dot={{r:3}} />
-                            <Line type="monotone" dataKey="Drama" stroke="#0ea5e9" strokeWidth={2} dot={{r:3}} />
-                            <Line type="monotone" dataKey="Comedy" stroke="#ec4899" strokeWidth={2} dot={{r:3}} />
-                            <Line type="monotone" dataKey="SciFi" stroke="#2dd4bf" strokeWidth={2} dot={{r:3}} />
-                            <Line type="monotone" dataKey="Horror" stroke="#f59e0b" strokeWidth={2} dot={{r:3}} />
-                        </LineChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-         </div>
-    </div>
-  );
-
-  // --- RENDER 3: YEARLY ---
-  const renderYear = () => (
-    <div className="space-y-8 animate-fadeIn">
-        
-        {/* GRADIENTS */}
-        <svg style={{ height: 0, width: 0, position: 'absolute' }}>
-            <defs>
-                <linearGradient id="runtimeGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#8b5cf6" />
-                    <stop offset="100%" stopColor="#0ea5e9" />
-                </linearGradient>
-                <linearGradient id="statusReleasedGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#38bdf8" stopOpacity={1}/>
-                    <stop offset="100%" stopColor="#0284c7" stopOpacity={0.8}/>
-                </linearGradient>
-                <linearGradient id="statusCanceledGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f472b6" stopOpacity={1}/>
-                    <stop offset="100%" stopColor="#be185d" stopOpacity={0.8}/>
-                </linearGradient>
-                <linearGradient id="statusEndedGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#a78bfa" stopOpacity={1}/>
-                    <stop offset="100%" stopColor="#7c3aed" stopOpacity={0.8}/>
-                </linearGradient>
-                <linearGradient id="qualityRatingGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ec4899" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#ec4899" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="qualityPopGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
-                </linearGradient>
-            </defs>
-        </svg>
-
-        {/* KPI */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-[#121212] p-6 rounded-xl border border-white/5 flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-purple-900/20 flex items-center justify-center border border-purple-500/20">
-                    <Crown className="w-7 h-7 text-purple-400" />
-                </div>
-                <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-widest font-bold">Golden Year</p>
-                    <h3 className="text-3xl font-black text-white mt-1">{yearKPI.golden}</h3>
-                    <p className="text-xs text-gray-500 mt-1">Best Avg Rating</p>
-                </div>
-            </div>
-            <div className="bg-[#121212] p-6 rounded-xl border border-white/5 flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-blue-900/20 flex items-center justify-center border border-blue-500/20">
-                    <TrendingUp className="w-7 h-7 text-blue-400" />
-                </div>
-                <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-widest font-bold">Peak Productivity</p>
-                    <h3 className="text-3xl font-black text-white mt-1">{yearKPI.peak}</h3>
-                    <p className="text-xs text-gray-500 mt-1">Highest Volume</p>
-                </div>
-            </div>
-            <div className="bg-[#121212] p-6 rounded-xl border border-white/5 flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-green-900/20 flex items-center justify-center border border-green-500/20">
-                    <Activity className="w-7 h-7 text-green-400" />
-                </div>
-                <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-widest font-bold">Current Year Perf.</p>
-                    <h3 className="text-3xl font-black text-white mt-1">{yearKPI.current}<span className="text-lg text-gray-500">/10</span></h3>
-                    <p className="text-xs text-gray-500 mt-1">Avg Rating (YTD)</p>
-                </div>
-            </div>
-        </div>
-
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5 lg:col-span-2">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-white">Quality Timeline</h3>
-                        <p className="text-xs text-gray-500">Avg Rating vs Popularity over time</p>
-                    </div>
-                    <Star className="w-5 h-5 text-pink-500" />
-                </div>
-                <div className="h-[350px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={qualityTimelineData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                            <XAxis dataKey="year" stroke="#666" />
-                            <YAxis yAxisId="left" stroke="#ec4899" domain={[0, 10]} label={{ value: 'Rating', angle: -90, position: 'insideLeft', fill: '#ec4899' }} />
-                            <YAxis yAxisId="right" orientation="right" stroke="#0ea5e9" domain={[0, 100]} label={{ value: 'Popularity', angle: 90, position: 'insideRight', fill: '#0ea5e9' }} />
-                            <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }} />
-                            <Legend />
-                            <Area yAxisId="left" type="monotone" dataKey="rating" stroke="#ec4899" strokeWidth={3} fillOpacity={1} fill="url(#qualityRatingGrad)" name="Avg Rating" />
-                            <Area yAxisId="right" type="monotone" dataKey="popularity" stroke="#0ea5e9" strokeWidth={3} fillOpacity={1} fill="url(#qualityPopGrad)" name="Avg Popularity" />
-                        </ComposedChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-white">Runtime Trends</h3>
-                        <p className="text-xs text-gray-500">Avg Duration (Minutes) per Year</p>
-                    </div>
-                    <Clock className="w-5 h-5 text-gray-500" />
-                </div>
-                <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={runtimeData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                            <XAxis dataKey="year" stroke="#666" />
-                            <YAxis stroke="#666" />
-                            <Tooltip cursor={{fill: '#ffffff10'}} contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }} />
-                            <Bar dataKey="minutes" fill="url(#runtimeGradient)" radius={[4, 4, 0, 0]} name="Avg Minutes" />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-white">Status Breakdown</h3>
-                        <p className="text-xs text-gray-500">Released vs Canceled vs Ended</p>
-                    </div>
-                    <AlertCircle className="w-5 h-5 text-gray-500" />
-                </div>
-                <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={statusData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                            <XAxis dataKey="year" stroke="#666" />
-                            <YAxis stroke="#666" />
-                            <Tooltip cursor={{fill: '#ffffff10'}} contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }} />
-                            <Legend />
-                            {/* Blue */}
-                            <Bar dataKey="released" stackId="a" fill="url(#statusReleasedGrad)" name="Released" />
-                            {/* Pink */}
-                            <Bar dataKey="canceled" stackId="a" fill="url(#statusCanceledGrad)" name="Canceled" />
-                            {/* Purple */}
-                            <Bar dataKey="ended" stackId="a" fill="url(#statusEndedGrad)" radius={[4, 4, 0, 0]} name="Ended" />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-        </div>
-    </div>
-  );
-
-  // --- RENDER 4: TALENT ---
-  const renderTalent = () => (
-    <div className="space-y-8 animate-fadeIn">
-        
-        {/* GRADIENT FOR TALENT */}
-        <svg style={{ height: 0, width: 0, position: 'absolute' }}>
-            <defs>
-                <linearGradient id="talentGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#8b5cf6" />
-                    <stop offset="100%" stopColor="#0ea5e9" />
-                </linearGradient>
-            </defs>
-        </svg>
-
-        {/* KPI */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-[#121212] p-6 rounded-xl border border-white/5 flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-blue-900/20 flex items-center justify-center border border-blue-500/20">
-                    <UserCheck className="w-7 h-7 text-blue-400" />
-                </div>
-                <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-widest font-bold">Most Used Actor</p>
-                    <h3 className="text-xl font-black text-white mt-1">{talentKPI.mostUsed}</h3>
-                    <p className="text-xs text-gray-500 mt-1">Frequent Collaborator</p>
-                </div>
-            </div>
-            {/* KPI: TOP DIRECTOR */}
-            <div className="bg-[#121212] p-6 rounded-xl border border-white/5 flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-pink-900/20 flex items-center justify-center border border-pink-500/20">
-                    <Award className="w-7 h-7 text-pink-400" />
-                </div>
-                <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-widest font-bold">Top Director</p>
-                    <h3 className="text-2xl font-black text-white mt-1">{talentKPI.topDirectorName}</h3>
-                    <p className="text-xs text-gray-500 mt-1">Avg Rating: <span className="text-pink-400 font-bold">{talentKPI.topDirectorRating}</span></p>
-                </div>
-            </div>
-            <div className="bg-[#121212] p-6 rounded-xl border border-white/5 flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-purple-900/20 flex items-center justify-center border border-purple-500/20">
-                    <Heart className="w-7 h-7 text-purple-400" />
-                </div>
-                <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-widest font-bold">Crew Retention</p>
-                    <h3 className="text-3xl font-black text-white mt-1">{talentKPI.retention}</h3>
-                    <p className="text-xs text-gray-500 mt-1">Returning Staff</p>
-                </div>
-            </div>
-        </div>
-
-        {/* CHART */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            
-            {/* 1. Top Collaborators */}
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-white">Top Collaborators</h3>
-                        <p className="text-xs text-gray-500">Most frequent actors & crew</p>
-                    </div>
-                    <UsersIcon className="w-5 h-5 text-blue-500" />
-                </div>
-                <div className="h-[350px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={topCollaboratorsData} layout="vertical" margin={{ left: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" horizontal={false} />
-                            <XAxis type="number" stroke="#666" fontSize={12} />
-                            <YAxis dataKey="name" type="category" stroke="#fff" fontSize={12} width={100} />
-                            <Tooltip cursor={{fill: '#ffffff10'}} contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }} />
-                            <Bar dataKey="count" fill="url(#talentGradient)" radius={[0, 4, 4, 0]} barSize={20} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-            {/* 2. Director Success */}
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-white">Director Success Rate</h3>
-                        <p className="text-xs text-gray-500">Quantity vs Quality (Rating)</p>
-                    </div>
-                    <Video className="w-5 h-5 text-pink-500" />
-                </div>
-                <div className="h-[350px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                            <XAxis type="number" dataKey="count" name="Movies" stroke="#666" label={{ value: 'Movies', position: 'insideBottomRight', offset: -5, fill: '#666' }} />
-                            <YAxis type="number" dataKey="rating" name="Rating" stroke="#666" domain={[0, 10]} label={{ value: 'Rating', angle: -90, position: 'insideLeft', fill: '#666' }} />
-                            <Tooltip content={({ active, payload }) => {
-                                    if (active && payload && payload.length) {
-                                      const data = payload[0].payload;
-                                      return (
-                                        <div className="bg-black border border-white/20 p-3 rounded-lg shadow-xl">
-                                          <p className="font-bold text-white mb-1">{data.name}</p>
-                                          <p className="text-xs text-gray-400">Movies: <span className="text-white">{data.count}</span></p>
-                                          <p className="text-xs text-gray-400">Rating: <span className="text-pink-400">{data.rating}</span></p>
-                                        </div>
-                                      );
-                                    }
-                                    return null;
-                                }}
-                            />
-                            <Scatter name="Directors" data={directorSuccessData} fill="#ec4899">
-                                {directorSuccessData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill="#ec4899" />
-                                ))}
-                            </Scatter>
-                        </ScatterChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-            {/* 3. Cast Impact */}
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5 lg:col-span-2">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-white">Cast Popularity Impact</h3>
-                        <p className="text-xs text-gray-500">Rating vs Popularity (Size = Movie Count)</p>
-                    </div>
-                    <Star className="w-5 h-5 text-purple-500" />
-                </div>
-                <div className="h-[350px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                            <XAxis type="number" dataKey="rating" name="Rating" stroke="#666" domain={[5, 10]} label={{ value: 'Avg Rating', position: 'insideBottom', offset: -5, fill: '#666' }} />
-                            <YAxis type="number" dataKey="popularity" name="Popularity" stroke="#666" domain={[0, 100]} label={{ value: 'Avg Popularity', angle: -90, position: 'insideLeft', fill: '#666' }} />
-                            <ZAxis type="number" dataKey="count" range={[100, 1000]} name="Movies" />
-                            <Tooltip content={({ active, payload }) => {
-                                    if (active && payload && payload.length) {
-                                      const data = payload[0].payload;
-                                      return (
-                                        <div className="bg-black border border-white/20 p-3 rounded-lg shadow-xl">
-                                          <p className="font-bold text-white mb-1">{data.name}</p>
-                                          <p className="text-xs text-gray-400">Rating: <span className="text-white">{data.rating}</span></p>
-                                          <p className="text-xs text-gray-400">Popularity: <span className="text-purple-400">{data.popularity}</span></p>
-                                          <p className="text-xs text-gray-400">Movies: {data.count}</p>
-                                        </div>
-                                      );
-                                    }
-                                    return null;
-                                }}
-                            />
-                            <Scatter name="Cast" data={castImpactData} fill="#8b5cf6" fillOpacity={0.7}>
-                                {castImpactData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill="#8b5cf6" />
-                                ))}
-                            </Scatter>
-                        </ScatterChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-        </div>
-    </div>
-  );
-
-  // --- RENDER 5: AKAS (AKAS-LANGUAGE) ---
-  const renderAKAs = () => (
-    <div className="space-y-8 animate-fadeIn">
-        
-        {/* GRADIENTS */}
-        <svg style={{ height: 0, width: 0, position: 'absolute' }}>
-            <defs>
-                <linearGradient id="globalReachGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ec4899" stopOpacity={0.4}/>
-                    <stop offset="95%" stopColor="#ec4899" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="barBluePurple" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#8b5cf6" />
-                    <stop offset="100%" stopColor="#0ea5e9" />
-                </linearGradient>
-            </defs>
-        </svg>
-
-        {/* KPI */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-[#121212] p-6 rounded-xl border border-white/5 flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-blue-900/20 flex items-center justify-center border border-blue-500/20">
-                    <Globe className="w-7 h-7 text-blue-400" />
-                </div>
-                <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-widest font-bold">Global Effort Score</p>
-                    <h3 className="text-3xl font-black text-white mt-1">{akasKPI.effortScore}</h3>
-                    <p className="text-xs text-gray-500 mt-1">Avg AKAs per Title</p>
-                </div>
-            </div>
-            <div className="bg-[#121212] p-6 rounded-xl border border-white/5 flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-pink-900/20 flex items-center justify-center border border-pink-500/20">
-                    <MapPin className="w-7 h-7 text-pink-400" />
-                </div>
-                <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-widest font-bold">Top Target Region</p>
-                    <h3 className="text-2xl font-black text-white mt-1">{akasKPI.topRegion}</h3>
-                    <p className="text-xs text-gray-500 mt-1">Highest AKA Count</p>
-                </div>
-            </div>
-            <div className="bg-[#121212] p-6 rounded-xl border border-white/5 flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-purple-900/20 flex items-center justify-center border border-purple-500/20">
-                    <Languages className="w-7 h-7 text-purple-400" />
-                </div>
-                <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-widest font-bold">Original Title Retention</p>
-                    <h3 className="text-3xl font-black text-white mt-1">{akasKPI.retention}</h3>
-                    <p className="text-xs text-gray-500 mt-1">Untranslated Titles</p>
-                </div>
-            </div>
-        </div>
-
-        {/* CHARTS */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            
-            {/* 1. Top Target Regions */}
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-white">Top Target Regions</h3>
-                        <p className="text-xs text-gray-500">Most localized markets (AKAs count)</p>
-                    </div>
-                    <MapPin className="w-5 h-5 text-blue-500" />
-                </div>
-                <div className="h-[350px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={regionData} layout="vertical" margin={{ left: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" horizontal={false} />
-                            <XAxis type="number" stroke="#666" fontSize={12} />
-                            <YAxis dataKey="name" type="category" stroke="#fff" fontSize={12} width={80} />
-                            <Tooltip cursor={{fill: '#ffffff10'}} contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }} />
-                            <Bar dataKey="count" fill="url(#barBluePurple)" radius={[0, 4, 4, 0]} barSize={20} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-            {/* 2. Language Coverage (Radar) */}
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-white">Language Coverage</h3>
-                        <p className="text-xs text-gray-500">Localization depth by language</p>
-                    </div>
-                    <RadarIcon className="w-5 h-5 text-pink-500" />
-                </div>
-                <div className="h-[350px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={languageRadarData}>
-                            <PolarGrid stroke="#333" />
-                            <PolarAngleAxis dataKey="subject" tick={{ fill: '#9ca3af', fontSize: 12 }} />
-                            <PolarRadiusAxis angle={30} domain={[0, 150]} tick={false} axisLine={false} />
-                            <Radar
-                                name="Titles"
-                                dataKey="A"
-                                stroke="#8b5cf6"
-                                strokeWidth={2}
-                                fill="#8b5cf6"
-                                fillOpacity={0.4}
-                            />
-                            <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333', borderRadius: '8px' }} />
-                        </RadarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-            {/* 3. Global Reach Trend (Area) */}
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5 lg:col-span-2">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-white">Global Reach Trend</h3>
-                        <p className="text-xs text-gray-500">Avg number of regions targeted per title (Yearly)</p>
-                    </div>
-                    <Globe className="w-5 h-5 text-purple-500" />
-                </div>
-                <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={globalReachData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                            <XAxis dataKey="year" stroke="#666" />
-                            <YAxis stroke="#666" />
-                            <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }} />
-                            <Area type="monotone" dataKey="regions" stroke="#ec4899" fillOpacity={1} fill="url(#globalReachGrad)" strokeWidth={3} />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-        </div>
-    </div>
-  );
-
-  // --- RENDER 6: CONTENT DETAILS ---
-  const renderContentDetails = () => (
-    <div className="space-y-8 animate-fadeIn">
-        
-        {/* GRADIENTS */}
-        <svg style={{ height: 0, width: 0, position: 'absolute' }}>
-            <defs>
-                <linearGradient id="distGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#8b5cf6" />
-                    <stop offset="100%" stopColor="#3b82f6" />
-                </linearGradient>
-                <linearGradient id="genreRunGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#ec4899" />
-                    <stop offset="100%" stopColor="#8b5cf6" />
-                </linearGradient>
-            </defs>
-        </svg>
-
-        {/* KPI */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-[#121212] p-6 rounded-xl border border-white/5 flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-blue-900/20 flex items-center justify-center border border-blue-500/20">
-                    <Clock className="w-7 h-7 text-blue-400" />
-                </div>
-                <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-widest font-bold">Avg Runtime (Movies)</p>
-                    <h3 className="text-3xl font-black text-white mt-1">{contentKPI.avgRuntimeMovie}</h3>
-                    <p className="text-xs text-gray-500 mt-1">Typical Length</p>
-                </div>
-            </div>
-            <div className="bg-[#121212] p-6 rounded-xl border border-white/5 flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-purple-900/20 flex items-center justify-center border border-purple-500/20">
-                    <Tv className="w-7 h-7 text-purple-400" />
-                </div>
-                <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-widest font-bold">Avg Runtime (Series)</p>
-                    <h3 className="text-3xl font-black text-white mt-1">{contentKPI.avgRuntimeSeries}</h3>
-                    <p className="text-xs text-gray-500 mt-1">Per Episode</p>
-                </div>
-            </div>
-            <div className="bg-[#121212] p-6 rounded-xl border border-white/5 flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-pink-900/20 flex items-center justify-center border border-pink-500/20">
-                    <ShieldAlert className="w-7 h-7 text-pink-400" />
-                </div>
-                <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-widest font-bold">Adult Content Ratio</p>
-                    <h3 className="text-3xl font-black text-white mt-1">{contentKPI.adultRatio}</h3>
-                    <p className="text-xs text-gray-500 mt-1">18+ Content</p>
-                </div>
-            </div>
-        </div>
-
-        {/* CHARTS */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            
-            {/* 1. Runtime Distribution (Histogram) */}
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-white">Runtime Distribution</h3>
-                        <p className="text-xs text-gray-500">Duration segments (Short vs Long)</p>
-                    </div>
-                    <Hourglass className="w-5 h-5 text-blue-500" />
-                </div>
-                <div className="h-[350px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={runtimeDistData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                            <XAxis dataKey="range" stroke="#666" fontSize={12} />
-                            <YAxis stroke="#666" />
-                            <Tooltip cursor={{fill: '#ffffff10'}} contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }} />
-                            <Bar dataKey="count" fill="url(#distGradient)" radius={[4, 4, 0, 0]} barSize={40} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-            {/* 2. Adult vs Family Performance */}
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-white">Adult vs Family</h3>
-                        <p className="text-xs text-gray-500">Rating & Popularity Comparison</p>
-                    </div>
-                    <Baby className="w-5 h-5 text-purple-500" />
-                </div>
-                <div className="h-[350px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={adultFamilyData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                            <XAxis dataKey="type" stroke="#666" fontSize={12} />
-                            <YAxis stroke="#666" />
-                            <Tooltip cursor={{fill: '#ffffff10'}} contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }} />
-                            <Legend />
-                            <Bar dataKey="rating" name="Rating (Avg)" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="popularity" name="Popularity (Avg)" fill="#ec4899" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-            {/* 3. Genre Runtime Average (Horizontal Bar) */}
-            <div className="bg-[#121212] p-6 rounded-2xl border border-white/5 lg:col-span-2">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-white">Genre Runtime Average</h3>
-                        <p className="text-xs text-gray-500">Which genres demand the most time?</p>
-                    </div>
-                    <Clock className="w-5 h-5 text-pink-500" />
-                </div>
-                <div className="h-[350px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={genreRuntimeData} layout="vertical" margin={{ left: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" horizontal={false} />
-                            <XAxis type="number" stroke="#666" />
-                            <YAxis dataKey="genre" type="category" stroke="#fff" width={80} />
-                            <Tooltip cursor={{fill: '#ffffff10'}} contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }} />
-                            <Bar dataKey="minutes" fill="url(#genreRunGradient)" radius={[0, 4, 4, 0]} barSize={25} name="Avg Minutes" />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-        </div>
-    </div>
-  );
+  /* =======================
+     OPTIONS
+  ======================= */
+  const options: Highcharts.Options = {
+    chart: {
+      map: worldMap as any,
+      backgroundColor: "transparent",
+      height: 420,
+      style: { fontFamily: 'inherit' }
+    },
+    title: { text: undefined },
+    legend: {
+      layout: "horizontal",
+      align: "center",
+      verticalAlign: "bottom",
+      itemStyle: {
+        color: "#9ca3af",
+        fontWeight: "bold",
+        fontSize: "10px",
+        textTransform: "uppercase"
+      },
+      symbolWidth: 300,
+    },
+    mapNavigation: {
+        enabled: true,
+        buttonOptions: {
+            verticalAlign: 'bottom',
+            align: 'right',
+            theme: {
+                fill: '#1a1a1a',
+                stroke: '#333',
+                style: { color: 'white' },
+                states: {
+                    hover: { fill: '#333' },
+                    select: { fill: '#ff3b3b' }
+                }
+            }
+        }
+    },
+    colorAxis: {
+      min: minVal,
+      max: maxVal,
+      stops: [
+        [0, "#330000"],   
+        [0.5, "#ff3b3b"], 
+        [1, "#ff9999"],   
+      ],
+      labels: { style: { color: "#9ca3af" } }
+    },
+    tooltip: {
+      backgroundColor: "rgba(0, 0, 0, 0.9)",
+      borderColor: "#ff3b3b",
+      borderRadius: 8,
+      style: { color: "#fff" },
+      headerFormat: "",
+      pointFormat: metric === 'rating' 
+        ? "<span style='font-size: 10px; text-transform:uppercase; color: #999'>{point.name}</span><br/><span style='font-size: 16px; font-weight: bold; color: #ff3b3b'><span style='color:yellow'>★</span> {point.value}</span> / 10"
+        : "<span style='font-size: 10px; text-transform:uppercase; color: #999'>{point.name}</span><br/><span style='font-size: 16px; font-weight: bold; color: #ff3b3b'>{point.value:,.0f}</span> Votes",
+    },
+    series: [
+      {
+        type: "map",
+        name: metric === 'rating' ? "Avg Rating" : "Total Votes",
+        data: chartData,
+        joinBy: ["hc-key", 0],
+        borderColor: "#121212", 
+        borderWidth: 1,
+        nullColor: "#2a2a2a", 
+        states: {
+          hover: {
+            color: "#ffffff", 
+            brightness: 0.1
+          },
+        },
+        dataLabels: { enabled: false }
+      },
+    ],
+    credits: { enabled: false },
+  };
 
   return (
-    <div className="relative min-h-screen font-sans overflow-x-hidden">
-      
-      {/* BACKGROUND UTAMA HITAM PEKAT */}
-      <div className="fixed inset-0 bg-[#0a0a0a] z-0" />
+    <div className="bg-[#121212] border border-white/5 rounded-2xl p-6 h-[500px] relative overflow-hidden group flex flex-col">
+       {/* HEADER DENGAN DROPDOWN */}
+       <div className="flex justify-between items-start mb-2 z-10">
+          <div>
+             <h3 className="text-white font-bold text-lg flex items-center gap-2"><MapIcon size={18} className="text-[#ff3b3b]" /> Global Demand Map</h3>
+             <p className="text-gray-500 text-xs mt-1">Intensity by {metric === 'rating' ? 'Quality Score' : 'Audience Volume'}</p>
+          </div>
+          
+          <div className="relative">
+            <button 
+              onClick={() => setIsOpen(!isOpen)}
+              className="flex items-center gap-2 text-xs font-bold text-gray-400 bg-white/5 px-3 py-1.5 rounded-lg hover:text-white transition-colors border border-white/5"
+            >
+              Metric: <span className="text-[#ff3b3b] uppercase">{metric}</span> <ChevronDown size={14} />
+            </button>
+            {isOpen && (
+              <div className="absolute right-0 top-full mt-2 w-32 bg-[#1a1a1a] border border-white/20 rounded-lg shadow-2xl overflow-hidden z-[99] animate-in fade-in zoom-in-95 duration-200">
+                  <button 
+                    onClick={() => { setMetric('votes'); setIsOpen(false); }}
+                    className={`w-full text-left px-4 py-3 text-xs font-bold uppercase transition-colors ${metric === 'votes' ? 'text-white bg-[#ff3b3b]' : 'text-gray-300 hover:bg-white/10'}`}
+                  >
+                    Votes
+                  </button>
+                  <button 
+                    onClick={() => { setMetric('rating'); setIsOpen(false); }}
+                    className={`w-full text-left px-4 py-3 text-xs font-bold uppercase transition-colors ${metric === 'rating' ? 'text-white bg-[#ff3b3b]' : 'text-gray-300 hover:bg-white/10'}`}
+                  >
+                    Rating
+                  </button>
+              </div>
+            )}
+          </div>
+       </div>
 
-      {/* SIDEBAR */}
-      {isSidebarOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />
-      )}
-      <div className={`fixed top-0 left-0 h-full w-72 bg-[#121212] border-r border-white/10 z-[60] transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="p-6 flex justify-between items-center border-b border-white/10 mt-16">
-            <h2 className="font-bold text-lg tracking-wider text-white">DASHBOARD MENU</h2>
-            <button onClick={() => setIsSidebarOpen(false)} className="text-gray-400 hover:text-white"><X className="w-6 h-6" /></button>
+       {/* MAP CONTAINER */}
+       <div className="w-full flex-1 rounded-2xl overflow-hidden">
+          <HighchartsReact
+            highcharts={Highcharts}
+            constructorType="mapChart"
+            options={options}
+          />
+       </div>
+    </div>
+  );
+};
+
+
+// ==========================================
+// DATA MOCKUP (DUMMY)
+// ==========================================
+
+// EXECUTIVE DATA
+const execKPIData = {
+  totalFilms: "1,245",
+  topGenre: "Action",
+  topGenrePercent: "34%",
+  topRatedGenre: "Animation",
+  topRatedGenreVal: "8.9",
+  avgRatingAll: "7.4"
+};
+
+const topCompaniesDataRaw = [
+  { name: "Disney", rating: 8.5, vote_count: 12000 },
+  { name: "Warner Bros", rating: 7.2, vote_count: 15000 },
+  { name: "Universal", rating: 7.8, vote_count: 9000 },
+  { name: "Paramount", rating: 6.9, vote_count: 8500 },
+  { name: "Sony", rating: 7.0, vote_count: 11000 },
+  { name: "Netflix", rating: 6.5, vote_count: 18000 },
+];
+
+const quantityQualityData = Array.from({ length: 15 }, (_, i) => ({
+  x: Math.floor(Math.random() * 100) + 10,
+  y: parseFloat(((Math.random() * 4) + 5).toFixed(1)),
+  z: Math.floor(Math.random() * 50000) + 1000 
+}));
+
+// REVISI: DATA YEARLY TREND (RATING & VOTE, BUKAN REVENUE)
+const yearlyTrendData = [
+  { year: '2020', Rating: 7.2, Vote: 250000 },
+  { year: '2021', Rating: 7.5, Vote: 320000 },
+  { year: '2022', Rating: 7.1, Vote: 280000 },
+  { year: '2023', Rating: 7.8, Vote: 410000 },
+  { year: '2024', Rating: 8.2, Vote: 560000 },
+];
+
+const successRateData = [
+  { name: 'Success', value: 85, fill: '#ff3b3b' },
+];
+
+// MARKETING DATA
+const marketKPIData = {
+  topCountryRating: { name: "Japan", val: "8.8" },
+  topCountryVotes: { name: "USA", val: "12.5M" },
+  lowCountryVotes: { name: "Timor Leste", val: "1.2K" }, 
+  topCountryAKA: { name: "France", val: "450 Titles" },
+  missingAKA: { count: "345", percent: "28%" }
+};
+
+const topCountryVotesData = [
+  { name: 'USA', votes: 125000 },
+  { name: 'UK', votes: 98000 },
+  { name: 'France', votes: 85000 },
+  { name: 'Germany', votes: 72000 },
+  { name: 'Japan', votes: 69000 },
+];
+
+const penetrationData = [
+  { name: 'US', interest: 4000, supply: 2400 },
+  { name: 'ID', interest: 3000, supply: 1398 },
+  { name: 'JP', interest: 2000, supply: 9800 },
+  { name: 'BR', interest: 2780, supply: 1200 },
+  { name: 'FR', interest: 1890, supply: 1500 },
+];
+
+const akaDonutData = [
+  { name: 'Localized', value: 72 }, 
+  { name: 'Missing', value: 28 }
+];
+
+const ratingDistributionData = [
+  { range: '< 5', count: 45 },
+  { range: '5-6', count: 120 },
+  { range: '6-7', count: 350 },
+  { range: '7-8', count: 580 },
+  { range: '8-9', count: 210 },
+  { range: '9-10', count: 85 },
+];
+
+
+// --- COMPONENT: KPI CARD ---
+const KPICard = ({ title, value, subtext, icon: Icon, color = "text-white" }: any) => (
+  <div className="bg-[#121212] p-6 rounded-2xl border border-white/5 relative overflow-hidden group hover:border-[#ff3b3b]/30 transition-all">
+    <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-2xl -mr-10 -mt-10 transition-all group-hover:bg-[#ff3b3b]/10" />
+    <div className="relative z-10 flex items-start justify-between">
+      <div>
+        <p className="text-gray-400 text-xs uppercase tracking-widest font-bold mb-2">{title}</p>
+        <h3 className={`text-3xl font-black ${color} mb-1`}>{value}</h3>
+        <p className="text-xs text-gray-500">{subtext}</p>
+      </div>
+      {Icon && <div className="p-3 bg-white/5 rounded-xl text-[#ff3b3b]"><Icon size={24} /></div>}
+    </div>
+  </div>
+);
+
+// --- COMPONENT: DYNAMIC CHART CONTAINER ---
+const ChartContainer = ({ title, subtitle, children, filterOptions, currentFilter, onFilterChange, height = "h-[450px]" }: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className={`bg-[#121212] p-6 rounded-2xl border border-white/5 flex flex-col ${height} relative`}>
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <h3 className="text-lg font-bold text-white">{title}</h3>
+          {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
         </div>
-        <div className="p-4 space-y-2">
-            {sidebarMenus.map((menu) => (
-                <button
-                    key={menu.id}
-                    onClick={() => { setActiveView(menu.id); setIsSidebarOpen(false); }}
-                    className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg text-sm font-medium transition-all ${activeView === menu.id ? "bg-white/5 text-white border border-white/20" : "text-gray-400 hover:bg-white/5 hover:text-white"}`}
-                    style={activeView === menu.id ? { color: themeColor, borderColor: themeColor, backgroundColor: `${themeColor}15` } : {}}
-                >
-                    <menu.icon className="w-5 h-5" />{menu.label}
-                </button>
-            ))}
+        
+        {filterOptions && (
+          <div className="relative">
+            <button 
+              onClick={() => setIsOpen(!isOpen)}
+              className="flex items-center gap-2 text-xs font-bold text-gray-400 bg-white/5 px-3 py-1.5 rounded-lg hover:text-white transition-colors border border-white/5"
+            >
+              Metric: <span className="text-[#ff3b3b] uppercase">{currentFilter.replace('_', ' ')}</span> <ChevronDown size={14} />
+            </button>
+            {isOpen && (
+              <div className="absolute right-0 top-full mt-2 w-40 bg-[#1a1a1a] border border-white/20 rounded-lg shadow-2xl overflow-hidden z-[99] animate-in fade-in zoom-in-95 duration-200">
+                {filterOptions.map((opt: string) => (
+                  <button 
+                    key={opt} 
+                    onClick={() => { onFilterChange(opt); setIsOpen(false); }}
+                    className={`w-full text-left px-4 py-3 text-xs font-bold uppercase transition-colors 
+                      ${currentFilter === opt ? 'text-white bg-[#ff3b3b]' : 'text-gray-300 hover:bg-white/10 hover:text-white'}
+                    `}
+                  >
+                    {opt.replace('_', ' ')}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="flex-1 w-full min-h-0 relative z-0">
+        {children}
+      </div>
+    </div>
+  );
+};
+
+// --- GLOBAL GRADIENTS DEFS ---
+const ChartGradients = () => (
+  <svg style={{ height: 0, width: 0, position: 'absolute' }}>
+    <defs>
+      <linearGradient id="barGradientRed" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stopColor="#ff3b3b" />
+        <stop offset="100%" stopColor="#991b1b" />
+      </linearGradient>
+      
+      <linearGradient id="areaGradientRed" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%" stopColor="#ff3b3b" stopOpacity={0.4}/>
+        <stop offset="95%" stopColor="#ff3b3b" stopOpacity={0}/>
+      </linearGradient>
+    </defs>
+  </svg>
+);
+
+
+// ==========================================
+// VIEW: EXECUTIVE DASHBOARD
+// ==========================================
+const ExecutiveView = () => {
+  const [compMetric, setCompMetric] = useState("rating"); 
+  const [trendMetric, setTrendMetric] = useState("Rating"); 
+
+  const sortedCompanies = [...topCompaniesDataRaw]
+    .sort((a: any, b: any) => b[compMetric] - a[compMetric])
+    .slice(0, 5);
+
+  return (
+    <div className="space-y-8 animate-fadeIn pb-10">
+      <ChartGradients />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <KPICard title="Total Production" value={execKPIData.totalFilms} subtext="Films produced all time" icon={Film} />
+        <KPICard title="Top Genre Volume" value={execKPIData.topGenre} subtext={`${execKPIData.topGenrePercent} of total library`} icon={PieIcon} color="text-[#ff3b3b]" />
+        <KPICard title="Highest Quality" value={execKPIData.topRatedGenre} subtext={`Avg Rating: ${execKPIData.topRatedGenreVal}`} icon={Star} color="text-yellow-400" />
+        <KPICard title="Global Avg Rating" value={execKPIData.avgRatingAll} subtext="Across all productions" icon={Activity} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <ChartContainer 
+            title="Top 5 Production Companies" 
+            subtitle={`Ranked by ${compMetric.replace('_', ' ')} (Descending)`}
+            filterOptions={["rating", "vote_count"]}
+            currentFilter={compMetric}
+            onFilterChange={setCompMetric}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={sortedCompanies} layout="vertical" margin={{ left: 10, right: 30 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" horizontal={false} />
+                <XAxis type="number" stroke="#666" fontSize={12} />
+                <YAxis dataKey="name" type="category" stroke="#fff" width={100} tick={{fontSize: 12}} />
+                <RechartsTooltip 
+                  cursor={{fill: 'transparent'}}
+                  contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }}
+                />
+                <Bar 
+                  dataKey={compMetric} 
+                  fill="url(#barGradientRed)" 
+                  radius={[0, 4, 4, 0]} 
+                  barSize={30} 
+                  animationDuration={800}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartContainer>
+        </div>
+        
+        <div className="bg-[#121212] border border-white/5 rounded-2xl p-6 flex flex-col items-center justify-center relative">
+           <h3 className="absolute top-6 left-6 text-white font-bold text-lg">Success Rate</h3>
+           <p className="absolute top-12 left-6 text-xs text-gray-500">Films rated &gt; 8.0</p>
+           <ResponsiveContainer width="100%" height={280}>
+             <RadialBarChart 
+                innerRadius="70%" 
+                outerRadius="100%" 
+                barSize={20} 
+                data={successRateData} 
+                startAngle={180} 
+                endAngle={0} 
+                cy="60%"
+             >
+               <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
+               <RadialBar
+                 background={{ fill: '#333' }}
+                 clockWise
+                 dataKey="value"
+                 cornerRadius={10}
+               />
+               <text x="50%" y="55%" textAnchor="middle" dominantBaseline="middle" className="fill-white text-5xl font-black">85%</text>
+               <text x="50%" y="65%" textAnchor="middle" dominantBaseline="middle" className="fill-gray-500 text-sm font-bold tracking-widest">SUCCESS</text>
+             </RadialBarChart>
+           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* MAIN CONTAINER (Padding Atas Dikurangi pt-16) */}
-      <div className="relative z-10 pt-16 px-6 pb-20 max-w-7xl mx-auto text-white">
-        {/* HEADER */}
-        <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-                <div className="flex items-center gap-3 mb-2">
-                    <button onClick={() => setIsSidebarOpen(true)} className="flex items-center gap-2 bg-[#1a1a1a] hover:bg-[#252525] px-4 py-2 rounded-lg border border-white/10 text-sm font-bold transition text-white"><Menu className="w-4 h-4" /> Filter By</button>
-                    <span className="text-gray-500 text-sm">/ {sidebarMenus.find(m => m.id === activeView)?.label}</span>
-                </div>
-                <h1 className="text-3xl font-bold flex items-center gap-3">{companyLabel} <span className="text-gray-500 font-light">{sidebarMenus.find(m => m.id === activeView)?.label}</span></h1>
-            </div>
-            <div className={`px-4 py-2 rounded-full border border-white/10 bg-[#1a1a1a] text-sm font-semibold flex items-center gap-2`} style={{ color: themeColor }}>
-                <Building2 className="w-4 h-4" />{role.toUpperCase()} ACCESS
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ChartContainer title="Quantity vs Quality Matrix" subtitle="X: Quantity, Y: Rating, Size: Votes">
+           <ResponsiveContainer width="100%" height="100%">
+             <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>
+               <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+               <XAxis type="number" dataKey="x" name="Quantity" stroke="#666" label={{ value: 'Quantity', position: 'insideBottomRight', offset: -5, fill: '#666' }} />
+               <YAxis type="number" dataKey="y" name="Quality" stroke="#666" domain={[0, 10]} label={{ value: 'Rating', angle: -90, position: 'insideLeft', fill: '#666' }} />
+               <ZAxis type="number" dataKey="z" range={[100, 800]} name="Votes" />
+               <RechartsTooltip 
+                  cursor={{ strokeDasharray: '3 3' }} 
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-black border border-white/20 p-3 rounded-lg shadow-xl text-white">
+                          <p className="font-bold text-sm mb-1 text-[#ff3b3b]">Point Data</p>
+                          <p className="text-xs text-gray-300">Quantity: {data.x}</p>
+                          <p className="text-xs text-gray-300">Rating: {data.y}</p>
+                          <p className="text-xs text-gray-300">Votes: {data.z.toLocaleString()}</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+               />
+               <Scatter name="Films" data={quantityQualityData} fill="#ff3b3b" fillOpacity={0.6} shape="circle" />
+             </ScatterChart>
+           </ResponsiveContainer>
+        </ChartContainer>
+
+        {/* REVISI: METRIC GANTI JADI RATING & VOTE */}
+        <ChartContainer 
+          title="Yearly Performance Trend" 
+          subtitle={`Trend of ${trendMetric} over time`}
+          filterOptions={["Rating", "Vote"]} // <-- GANTI REVENUE JADI VOTE
+          currentFilter={trendMetric}
+          onFilterChange={setTrendMetric}
+        >
+           <ResponsiveContainer width="100%" height="100%">
+             <AreaChart data={yearlyTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+               <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+               <XAxis dataKey="year" stroke="#666" fontSize={12} />
+               <YAxis stroke="#666" fontSize={12} domain={trendMetric === 'Rating' ? [5, 10] : [0, 'auto']} />
+               <RechartsTooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }} />
+               <Area 
+                 type="monotone" 
+                 dataKey={trendMetric} 
+                 stroke="#ff3b3b" 
+                 fill="url(#areaGradientRed)" 
+                 strokeWidth={3} 
+                 animationDuration={1000}
+               />
+             </AreaChart>
+           </ResponsiveContainer>
+        </ChartContainer>
+      </div>
+    </div>
+  );
+};
+
+
+// ==========================================
+// VIEW: MARKETING DASHBOARD
+// ==========================================
+const MarketingView = () => {
+  return (
+    <div className="space-y-8 animate-fadeIn pb-10">
+      <ChartGradients />
+
+      {/* KPI Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <KPICard title="Top Avg Rating" value={marketKPIData.topCountryRating.name} subtext={`Score: ${marketKPIData.topCountryRating.val}`} icon={Star} color="text-yellow-400" />
+        
+        <div className="bg-[#121212] p-6 rounded-2xl border border-white/5 relative group hover:border-[#ff3b3b]/30 transition-all flex flex-col justify-between">
+           <div>
+              <p className="text-gray-400 text-xs uppercase tracking-widest font-bold mb-2">Audience Extremes</p>
+              <div className="flex justify-between items-center mb-2">
+                 <span className="text-2xl font-black text-white">{marketKPIData.topCountryVotes.name}</span>
+                 <span className="text-[10px] font-bold text-green-400 bg-green-900/20 px-2 py-1 rounded uppercase tracking-wider">High</span>
+              </div>
+              <div className="flex justify-between items-center">
+                 <span className="text-lg font-bold text-gray-400">{marketKPIData.lowCountryVotes.name}</span>
+                 <span className="text-[10px] font-bold text-red-400 bg-red-900/20 px-2 py-1 rounded uppercase tracking-wider">Low</span>
+              </div>
+           </div>
+           <div className="absolute top-4 right-4 p-2 bg-white/5 rounded-xl text-[#0ea5e9]">
+              <Users size={20} />
+           </div>
         </div>
 
-        {/* LOGIC SWITCHING CONTENT */}
-        {activeView === "overview" && renderOverview()}
-        {activeView === "genre" && renderGenre()}
-        {activeView === "year" && renderYear()}
-        {activeView === "talent" && renderTalent()}
-        {activeView === "akas" && renderAKAs()}
-        {activeView === "content" && renderContentDetails()}
+        <KPICard title="Most Localized" value={marketKPIData.topCountryAKA.name} subtext={marketKPIData.topCountryAKA.val} icon={Globe} color="text-green-400" />
+        <KPICard title="Localization Gap" value={marketKPIData.missingAKA.count} subtext={`${marketKPIData.missingAKA.percent} Unlocalized`} icon={AlertCircle} color="text-[#ff3b3b]" />
+      </div>
+
+      {/* Row 1: Choropleth Map with Metric Switcher */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+           <ChoroplethMap />
+        </div>
+
+        {/* PENETRATION CHART */}
+        <ChartContainer title="Disney Penetration" subtitle="Demand vs Supply" height="h-[500px]">
+           <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={penetrationData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                <XAxis dataKey="name" stroke="#666" fontSize={12} />
+                <YAxis stroke="#666" fontSize={12} />
+                <RechartsTooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }} />
+                <Legend wrapperStyle={{ fontSize: '10px' }} />
+                <Bar dataKey="interest" fill="#333" name="Market Demand" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="supply" fill="url(#barGradientRed)" name="Disney Supply" radius={[4, 4, 0, 0]} />
+              </BarChart>
+           </ResponsiveContainer>
+        </ChartContainer>
+      </div>
+
+      {/* Row 2: Votes, AKA, Rating Distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+         <ChartContainer title="Top 5 Countries by Votes" subtitle="Audience Volume">
+            <ResponsiveContainer width="100%" height="100%">
+               <BarChart data={topCountryVotesData} layout="vertical" margin={{left:10, right: 30}}>
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="name" type="category" stroke="#fff" width={60} fontSize={11} />
+                  <RechartsTooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333' }} />
+                  <Bar 
+                    dataKey="votes" 
+                    fill="url(#barGradientRed)" 
+                    radius={[0, 4, 4, 0]} 
+                    barSize={35} 
+                  />
+               </BarChart>
+            </ResponsiveContainer>
+         </ChartContainer>
+
+         <div className="bg-[#121212] border border-white/5 rounded-2xl p-6 h-[450px]">
+            <h3 className="text-white font-bold text-lg mb-1">Localization Status</h3>
+            <p className="text-xs text-gray-500 mb-4">AKA Availability</p>
+            <ResponsiveContainer width="100%" height="80%">
+               <PieChart>
+                  <Pie 
+                    data={akaDonutData} 
+                    cx="50%" cy="50%" 
+                    innerRadius={60} 
+                    outerRadius={80} 
+                    paddingAngle={5} 
+                    dataKey="value"
+                  >
+                    <Cell key="localized" fill="url(#barGradientRed)" />
+                    <Cell key="missing" fill="#333" />
+                  </Pie>
+                  <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-white text-3xl font-black">72%</text>
+                  <text x="50%" y="60%" textAnchor="middle" dominantBaseline="middle" className="fill-gray-500 text-sm font-bold uppercase">Localized</text>
+                  <Legend verticalAlign="bottom" />
+               </PieChart>
+            </ResponsiveContainer>
+         </div>
+
+         {/* RATING DISTRIBUTION CHART */}
+         <ChartContainer title="Rating Distribution" subtitle="Audience score breakdown">
+            <ResponsiveContainer width="100%" height="100%">
+               <BarChart data={ratingDistributionData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                 <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                 <XAxis 
+                    dataKey="range" 
+                    stroke="#666" 
+                    fontSize={12} 
+                    tickLine={false} 
+                    axisLine={false} 
+                 />
+                 <YAxis 
+                    stroke="#666" 
+                    fontSize={12} 
+                    tickLine={false} 
+                    axisLine={false} 
+                 />
+                 <RechartsTooltip 
+                    cursor={{fill: 'transparent'}} 
+                    contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }} 
+                 />
+                 <Bar 
+                    dataKey="count" 
+                    name="Titles" 
+                    fill="url(#barGradientRed)" 
+                    radius={[4, 4, 0, 0]} 
+                    barSize={40} 
+                    animationDuration={1000}
+                 />
+               </BarChart>
+            </ResponsiveContainer>
+         </ChartContainer>
+      </div>
+    </div>
+  );
+};
+
+
+// ==========================================
+// MAIN PAGE COMPONENT
+// ==========================================
+function DashboardContent() {
+  const [mounted, setMounted] = useState(false);
+  const [role, setRole] = useState<'executive' | 'marketing'>('executive');
+  
+  const [filters, setFilters] = useState({
+    genre: 'All',
+    year: '2024',
+    country: 'Global'
+  });
+
+  useEffect(() => { setMounted(true); }, []);
+
+  if (!mounted) return <div className="p-10 text-center text-white bg-[#0a0a0a] min-h-screen flex items-center justify-center">Loading Empire Data...</div>;
+
+  return (
+    <div className="relative min-h-screen font-sans text-white bg-[#0a0a0a]">
+      {/* MANTRA HITAM MUTLAK */}
+      <style jsx global>{`
+        html, body {
+          background-color: #0a0a0a !important;
+          margin: 0;
+          padding: 0;
+          overflow-x: hidden;
+        }
+
+        /* FIX SPACE KOSONG DI ATAS PAGE */
+        body::before {
+          content: "";
+          position: fixed;
+          inset: 0;
+          background: #0a0a0a;
+          z-index: -1;
+        }
+      `}</style>
+
+      <div className="relative z-10 pt-15 px-6 pb-20 max-w-7xl mx-auto">
         
-        {/* Fallback */}
-        {activeView !== "overview" && activeView !== "genre" && activeView !== "year" && activeView !== "talent" && activeView !== "akas" && activeView !== "content" && (
-            <div className="flex flex-col items-center justify-center py-20 text-gray-500">
-                <p className="text-xl font-bold">Data Module: {sidebarMenus.find(m => m.id === activeView)?.label}</p>
-                <p className="text-sm mt-2">Connecting to secure server...</p>
-            </div>
+        {/* HEADER SECTION */}
+        <div className="flex flex-col md:flex-row justify-between items-end mb-10 gap-6">
+           <div>
+             <h1 className="text-4xl lg:text-5xl font-black tracking-tighter uppercase mb-2 flex items-center gap-3">
+               Walt Disney <span className="text-[#ff3b3b]">Studios</span>
+             </h1>
+             <p className="text-gray-400 text-sm max-w-md">
+               Real-time performance analytics for <span className="text-white font-bold">{role === 'executive' ? 'Strategic Decisions' : 'Market Expansion'}</span>.
+             </p>
+           </div>
+
+           {/* ROLE SWITCHER TOGGLE */}
+           <div className="bg-[#1a1a1a] p-1.5 rounded-xl border border-white/10 flex">
+              <button 
+                onClick={() => setRole('executive')}
+                className={`px-6 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${role === 'executive' ? 'bg-[#ff3b3b] text-white shadow-lg shadow-red-900/20' : 'text-gray-500 hover:text-white'}`}
+              >
+                Executive
+              </button>
+              <button 
+                onClick={() => setRole('marketing')}
+                className={`px-6 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${role === 'marketing' ? 'bg-[#0ea5e9] text-white shadow-lg shadow-blue-900/20' : 'text-gray-500 hover:text-white'}`}
+              >
+                Marketing
+              </button>
+           </div>
+        </div>
+
+        {/* GLOBAL FILTERS TOOLBAR */}
+        <div className="bg-[#121212] border border-white/5 p-4 rounded-xl mb-10 flex flex-wrap gap-4 items-center shadow-2xl relative z-40">
+           <div className="flex items-center gap-2 text-[#ff3b3b] font-bold uppercase text-xs tracking-widest mr-4 border-r border-white/10 pr-6 h-8">
+              <Filter size={16} /> Filters
+           </div>
+           
+           <div className="flex items-center gap-2 bg-black/40 px-4 py-2 rounded-lg border border-white/10">
+              <span className="text-xs text-gray-500 uppercase font-bold">Genre</span>
+              <select 
+                className="bg-transparent text-sm font-bold text-white outline-none cursor-pointer"
+                value={filters.genre}
+                onChange={(e) => setFilters({...filters, genre: e.target.value})}
+              >
+                <option value="All" className="text-black">All Genres</option>
+                <option value="Fantasy" className="text-black">Fantasy</option>
+                <option value="Action" className="text-black">Action</option>
+              </select>
+           </div>
+
+           <div className="flex items-center gap-2 bg-black/40 px-4 py-2 rounded-lg border border-white/10">
+              <span className="text-xs text-gray-500 uppercase font-bold">Year</span>
+              <select 
+                className="bg-transparent text-sm font-bold text-white outline-none cursor-pointer"
+                value={filters.year}
+                onChange={(e) => setFilters({...filters, year: e.target.value})}
+              >
+                <option value="All" className="text-black">All Time</option>
+                <option value="2024" className="text-black">2024</option>
+              </select>
+           </div>
+
+           <div className="flex items-center gap-2 bg-black/40 px-4 py-2 rounded-lg border border-white/10">
+              <span className="text-xs text-gray-500 uppercase font-bold">Region</span>
+              <select 
+                className="bg-transparent text-sm font-bold text-white outline-none cursor-pointer"
+                value={filters.country}
+                onChange={(e) => setFilters({...filters, country: e.target.value})}
+              >
+                <option value="Global" className="text-black">Global</option>
+                <option value="USA" className="text-black">USA</option>
+              </select>
+           </div>
+        </div>
+
+        {/* DYNAMIC CONTENT */}
+        {role === 'executive' ? (
+           <ExecutiveView />
+        ) : (
+           <MarketingView />
         )}
 
       </div>
@@ -1052,9 +755,9 @@ function DashboardContent() {
 }
 
 export default function DashboardPage() {
-    return (
-        <Suspense fallback={<div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center font-bold">Loading Dashboard...</div>}>
-            <DashboardContent />
-        </Suspense>
-    );
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center font-bold">Loading Dashboard...</div>}>
+      <DashboardContent />
+    </Suspense>
+  );
 }
